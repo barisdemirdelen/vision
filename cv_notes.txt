@@ -1,0 +1,9 @@
+clustering:
+
+sample size 5
+vocabulary size 400
+descriptor samples 100000
+
+training:
+
+sample size 50

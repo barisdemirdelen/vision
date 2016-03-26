@@ -1,50 +1,80 @@
-function bow()
+function descrs = bow(imPath)
 cl_rgb = 'rgb';
 cl_hsv = 'hsv';
 cl_opp = 'opponent';
 cl = cl_rgb;
-samplesize = 50;
+samplesize = 20;
 vocabsize = 400;
-numdescr = 100000; %number of descriptors
-load_from_file = true;
+numdescr = 1000; %number of descriptors
+load_from_file = true
 
-disp('Loading dataset')
-[all_images, all_images_valid] = load_dataset(samplesize);
+disp('Loading images')
+imPath = 'CalTech4/imageData/motorbikes_train';
+motors = load_images(imPath, samplesize);
+imPath = 'CalTech4/imageData/faces_train';
+faces = load_images(imPath, samplesize);
+imPath = 'CalTech4/imageData/airplanes_train';
+airplanes = load_images(imPath, samplesize);
+imPath = 'CalTech4/imageData/cars_train';
+cars = load_images(imPath, samplesize);
+
+all_images = [cars, airplanes, faces, motors];
+
+imPath = 'CalTech4/imageData/motorbikes_test';
+motors_valid = load_images(imPath, samplesize);
+imPath = 'CalTech4/imageData/faces_test';
+faces_valid = load_images(imPath, samplesize);
+imPath = 'CalTech4/imageData/airplanes_test';
+airplanes_valid = load_images(imPath, samplesize);
+imPath = 'CalTech4/imageData/cars_test';
+cars_valid = load_images(imPath, samplesize);
+
+all_images_valid = [cars_valid, airplanes_valid, faces_valid, motors_valid];
 disp('Getting descriptors')
 [centers] = get_kmeans(all_images, cl, numdescr, vocabsize, load_from_file);
 tree = get_tree(centers, vocabsize);
 
 calculate_map(tree, cl, 2, all_images_valid, samplesize)
-% train(tree, cl, all_images, samplesize)
-end
 
-function train(tree, cl, all_images, samplesize)
-train_data = [];
 for j=1:4
     disp('Processing data');
+    train_data = [];
     train_labels = [];
+    valid_data = [];
+    valid_labels = [];
     for k=1:4
-        for i=1:samplesize
-            if j == 1
-                disp((k-1)*samplesize + i)
-                h = get_histogram(tree,all_images{1,(k-1)*samplesize + i}, cl);
-                features = h;
-                features = 1.0 * features ./ max(features);
-                features = reshape(features, 1, []);
-                train_data = [train_data; features];
-            end
+        for i=1:floor(samplesize/2)
+            h = get_histogram(tree,all_images{1,(k-1)*samplesize + i}, cl);
+            features = h;
+            features = 1.0 * features ./ max(features);
+            features = reshape(features, 1, []);
+            train_data = [train_data; features];
             if k == j
                 train_labels = [train_labels; 1];
             else
                 train_labels = [train_labels; 0];
             end
         end
+        for i=floor(samplesize/2)+1:samplesize
+            h = get_histogram(tree,all_images{1,(k-1)*samplesize + i}, cl);
+            features = h;
+            features = 1.0 * features ./ max(features);
+            features = reshape(features, 1, []);
+            valid_data = [valid_data; features];
+            if k == j
+                valid_labels = [valid_labels; 1];
+            else
+                valid_labels = [valid_labels; 0];
+            end
+        end
     end
+    size(train_data)
+    size(valid_data)
     disp('Training');
     model = svmtrain(train_labels, train_data, '-g 0.07 -b 1');
     save(strcat('./svm_model', num2str(j), '.mat'), 'model');
+    [prediction, accuracy, prob_values] = svmpredict(valid_labels, valid_data, model, '-b 1');
 end
-save(strcat('./train_data', num2str(samplesize),'-', num2str(tree.K),'.mat'), 'train_data');
 end
 
 function highest_model = classify(tree, cl, im)
@@ -64,12 +94,12 @@ for j=1:4
 end
 end
 
-function map = calculate_map(tree, cl, classifier, test_images, samplesize)
+function highest_model = calculate_map(tree, cl, classifier, test_images, samplesize)
 load(strcat('./svm_model', num2str(classifier), '.mat'), 'model');
 test_labels = [];
 test_data = [];
 for k=1:4
-    for i=1:samplesize
+    for i=1:size(test_images)
         h = get_histogram(tree,test_images{1,(k-1)*samplesize + i}, cl);
         features = h;
         features = 1.0 * features ./ max(features);
@@ -83,7 +113,7 @@ for k=1:4
     end
 end
 [prediction, accuracy, prob_values] = svmpredict(test_labels, test_data, model, '-b 1');
-map = get_map(prob_values(:,2), test_labels, samplesize);
+map = get_map(prediction, test_labels);
 disp(map);
 end
 
@@ -130,27 +160,20 @@ if size(im,1) > 480
 end
 end
 
-function map= get_map(prediction_probs, labels, samplesize)
+function map= get_map(prediction_probs, labels)
 correct = 0;
-total = 0;
 map = 0;
-to_sort = horzcat(prediction_probs, labels);
-to_sort = sortrows(to_sort, -1);
 
-prediction = to_sort(:,1);
-labels = to_sort(:,2);
 
+
+disp(size(prediction,1))
 for m=1:size(prediction)
-    if m > samplesize
-        break;
-    end
-    total = total+1;
-    if 1 == labels(m)
+    if prediction(m) == labels(m)
         correct = correct + 1;
     end
     map = map + correct / m;
 end
-map = map / total;
+map = map / size(prediction,1);
 disp(strcat('Mean Average Precision: ', num2str(map)));
 end
 
@@ -183,28 +206,4 @@ else
     
     save('./centers.mat', 'centers') ;
 end
-end
-
-function [all_images, all_images_valid] = load_dataset(samplesize)
-imPath = 'CalTech4/imageData/motorbikes_train';
-motors = load_images(imPath, samplesize);
-imPath = 'CalTech4/imageData/faces_train';
-faces = load_images(imPath, samplesize);
-imPath = 'CalTech4/imageData/airplanes_train';
-airplanes = load_images(imPath, samplesize);
-imPath = 'CalTech4/imageData/cars_train';
-cars = load_images(imPath, samplesize);
-
-all_images = [cars, airplanes, faces, motors];
-
-imPath = 'CalTech4/imageData/motorbikes_test';
-motors_valid = load_images(imPath, samplesize);
-imPath = 'CalTech4/imageData/faces_test';
-faces_valid = load_images(imPath, samplesize);
-imPath = 'CalTech4/imageData/airplanes_test';
-airplanes_valid = load_images(imPath, samplesize);
-imPath = 'CalTech4/imageData/cars_test';
-cars_valid = load_images(imPath, samplesize);
-
-all_images_valid = [cars_valid, airplanes_valid, faces_valid, motors_valid];
 end

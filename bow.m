@@ -3,19 +3,29 @@ cl_rgb = 'rgb';
 cl_hsv = 'hsv';
 cl_opp = 'opponent';
 cl = cl_rgb;
-samplesize = 50;
-vocabsize = 400;
-numdescr = 100000; %number of descriptors
-load_from_file = true;
+samplesize = 5;
+vocabsize = 800;
+numdescr = 2500; %number of descriptors
+load_from_file = false;
+vocabs = [400,800,1600,2000,4000];
 
-disp('Loading dataset')
-[all_images, all_images_valid] = load_dataset(samplesize);
-disp('Getting descriptors')
-[centers] = get_kmeans(all_images, cl, numdescr, vocabsize, load_from_file);
-tree = get_tree(centers, vocabsize);
+for i=1:5
+    vocabsize = vocabs(i);
+    samplesize = 100;
+    disp(vocabsize);
+    disp('Loading dataset')
+    [all_images, ~] = load_dataset(samplesize);
+    disp('Getting descriptors')
+    [centers] = get_kmeans(all_images, cl, numdescr, vocabsize, samplesize, load_from_file);
+    tree = get_tree(centers, vocabsize);
 
-calculate_map(tree, cl, 2, all_images_valid, samplesize)
-% train(tree, cl, all_images, samplesize)
+    samplesize = 50;
+    disp('Loading dataset')
+    [all_images, all_images_valid] = load_dataset(samplesize);
+
+    train(tree, cl, all_images, samplesize)
+    calculate_map(tree, cl, 2, all_images_valid, samplesize)
+end
 end
 
 function train(tree, cl, all_images, samplesize)
@@ -42,7 +52,7 @@ for j=1:4
     end
     disp('Training');
     model = svmtrain(train_labels, train_data, '-g 0.07 -b 1');
-    save(strcat('./svm_model', num2str(j), '.mat'), 'model');
+    save(strcat('./svm_model', num2str(j),'-',num2str(samplesize),'-', num2str(tree.K), '.mat'), 'model');
 end
 save(strcat('./train_data', num2str(samplesize),'-', num2str(tree.K),'.mat'), 'train_data');
 end
@@ -51,7 +61,7 @@ function highest_model = classify(tree, cl, im)
 highest_prob = 0;
 highest_model = -1;
 for j=1:4
-    load(strcat('./svm_model', num2str(j), '.mat'), 'model');
+    load(strcat('./svm_model', num2str(j),'-',num2str(samplesize),'-', num2str(tree.K), '.mat'), 'model');
     h = get_histogram(tree,im, cl);
     features = h;
     features = 1.0 * features ./ max(features);
@@ -65,11 +75,12 @@ end
 end
 
 function map = calculate_map(tree, cl, classifier, test_images, samplesize)
-load(strcat('./svm_model', num2str(classifier), '.mat'), 'model');
+load(strcat('./svm_model', num2str(classifier),'-',num2str(samplesize),'-', num2str(tree.K), '.mat'), 'model');
 test_labels = [];
 test_data = [];
 for k=1:4
     for i=1:samplesize
+        disp((k-1)*samplesize + i)
         h = get_histogram(tree,test_images{1,(k-1)*samplesize + i}, cl);
         features = h;
         features = 1.0 * features ./ max(features);
@@ -85,20 +96,22 @@ end
 [prediction, accuracy, prob_values] = svmpredict(test_labels, test_data, model, '-b 1');
 map = get_map(prob_values(:,2), test_labels, samplesize);
 disp(map);
+save(strcat('./test_data', num2str(samplesize),'-', num2str(tree.K),'.mat'), 'test_data');
 end
 
-function descs = get_descriptors(arrImages, cl)
+function descs = get_descriptors(arrImages, numdescr, cl)
 %descs = zeros(384, 72038*size(arrImages, 2));
-descs = [];
+descs = zeros(384, numdescr*size(arrImages, 2));
 %    size(arrImages)
 for i=1:size(arrImages, 2)
     
     im = fitimage(arrImages{i});
     [~, d]=vl_phow(im2single(im),'Color', cl) ;
     %size(d)
-    
-    descs =horzcat(descs, uint8(d));
-    size(descs)
+    k = randperm(size(d,2));
+    sample_descs = d(:,k(1:numdescr));
+    descs(:,(i-1)*numdescr + 1:i*numdescr) = uint8(sample_descs);
+    disp(i)
     
 end
 end
@@ -161,12 +174,12 @@ tree.depth = 1;
 tree.centers = int32(centers);
 end
 
-function [centers] = get_kmeans(all_images, cl, numdescr, vocabsize, load_from_file)
+function [centers] = get_kmeans(all_images, cl, numdescr, vocabsize, samplesize, load_from_file)
 if load_from_file
-    load('./centers.mat');
+    load(strcat('./centers', num2str(samplesize),'-', num2str(vocabsize),'.mat'));
 else
     
-    [descs] = get_descriptors(all_images,cl);
+    [descs] = get_descriptors(all_images,numdescr, cl);
     
     %cluster data
     disp('Clustering data')
@@ -175,13 +188,14 @@ else
     % data = data(:,1:numdescr);
     % find clusters
     disp('k-means')
-    sample_descs = double(vl_colsubset(descs, numdescr));
+    % sample_descs = double(vl_colsubset(descs, numdescr));
+    sample_descs = descs;
     [centers, ~] = vl_kmeans(sample_descs, vocabsize,'distance', 'l2', 'algorithm', 'ELKAN');
     
     %disp(tree)
     %visual words
     
-    save('./centers.mat', 'centers') ;
+    save(strcat('./centers', num2str(samplesize),'-', num2str(vocabsize),'.mat'),'centers');
 end
 end
 
@@ -198,13 +212,13 @@ cars = load_images(imPath, samplesize);
 all_images = [cars, airplanes, faces, motors];
 
 imPath = 'CalTech4/imageData/motorbikes_test';
-motors_valid = load_images(imPath, samplesize);
+motors_valid = load_images(imPath, 50);
 imPath = 'CalTech4/imageData/faces_test';
-faces_valid = load_images(imPath, samplesize);
+faces_valid = load_images(imPath, 50);
 imPath = 'CalTech4/imageData/airplanes_test';
-airplanes_valid = load_images(imPath, samplesize);
+airplanes_valid = load_images(imPath, 50);
 imPath = 'CalTech4/imageData/cars_test';
-cars_valid = load_images(imPath, samplesize);
+cars_valid = load_images(imPath, 50);
 
 all_images_valid = [cars_valid, airplanes_valid, faces_valid, motors_valid];
 end

@@ -19,24 +19,24 @@ for j=1:3
     if j == 3
         cl = cl_rgb;
     end
-for i=1:3
-    vocabsize = vocabs(i);
-    samplesize = 10;
-    disp(vocabsize);
-    disp('Loading dataset')
-    [all_images, ~] = load_dataset(samplesize);
-    disp('Getting descriptors')
-    [centers] = get_kmeans(all_images, cl, numdescr, vocabsize, samplesize, load_from_file);
-    
-    samplesize = 50;
-    disp('Loading dataset')
-    [all_images, all_images_valid] = load_dataset(samplesize);
-    
-    train_models(centers, cl, all_images, samplesize)
-    
-    % calculate a map to generate test histograms
-    calculate_map(centers, cl, 2, all_images_valid, samplesize)
-end
+    for i=1:3
+        vocabsize = vocabs(i);
+        samplesize = 10;
+        disp(vocabsize);
+        disp('Loading dataset')
+        [all_images, ~] = load_dataset(samplesize);
+        disp('Getting descriptors')
+        [centers] = get_kmeans(all_images, cl, numdescr, vocabsize, samplesize, load_from_file);
+        
+        samplesize = 50;
+        disp('Loading dataset')
+        [all_images, all_images_valid] = load_dataset(samplesize);
+        
+        train_models(centers, cl, all_images, samplesize)
+        
+        % calculate a map to generate test histograms
+        calculate_map(centers, cl, 2, all_images_valid, samplesize)
+    end
 end
 end
 

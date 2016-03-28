@@ -19,64 +19,64 @@ for j=1:3
     if j == 3
         cl = cl_rgb;
     end
-for i=1:3
-    vocabsize = vocabs(i);
-    samplesize = 10;
-    disp(vocabsize);
-    disp('Loading dataset')
-    [all_images, ~] = load_dataset(samplesize);
-    disp('Getting descriptors')
-    [centers] = get_kmeans(all_images, cl, numdescr, vocabsize, samplesize, load_from_file);
-    
-    samplesize = 50;
-    disp('Loading dataset')
-    [all_images, all_images_valid] = load_dataset(samplesize);
-    image_matrix = []
-    aps = [];
-    for k=1:4
-        image_list = []
-        [map, ids] = calculate_map(centers, cl, k, all_images_valid, samplesize);
-        aps = [aps; map];
-        for id_index=1:size(ids)
-            image_path = get_image_path(ids(id_index));
-            image_list = [image_list; {image_path}];
+    for i=1:3
+        vocabsize = vocabs(i);
+        samplesize = 10;
+        disp(vocabsize);
+        disp('Loading dataset')
+        [all_images, ~] = load_dataset(samplesize);
+        disp('Getting descriptors')
+        [centers] = get_kmeans(all_images, cl, numdescr, vocabsize, samplesize, load_from_file);
+        
+        samplesize = 50;
+        disp('Loading dataset')
+        [~, all_images_valid] = load_dataset(samplesize);
+        image_matrix = [];
+        aps = [];
+        for k=1:4
+            image_list = [];
+            [map, ids] = calculate_map(centers, cl, k, all_images_valid, samplesize);
+            aps = [aps; map];
+            for id_index=1:size(ids)
+                image_path = get_image_path(ids(id_index));
+                image_list = [image_list; {image_path}];
+            end
+            image_matrix = [image_matrix {image_list}];
         end
-        image_matrix = [image_matrix {image_list}];
+        disp(image_matrix);
+        disp(aps);
+        total_map = mean(aps);
+        disp(total_map);
+        
+        write_html(cl, vocabsize,numdescr, total_map, aps, image_matrix);
     end
-    disp(image_matrix);
-    disp(aps);
-    total_map = mean(aps);
-    disp(total_map);
-    
-    write_html(cl, vocabsize,numdescr, total_map, aps, image_matrix);
-end
 end
 end
 
 function write_html(cl, vocabsize,numdescr, total_map, aps, image_matrix)
-    fileID = fopen(strcat('results/Result-', cl,'-',num2str(vocabsize),'.html'),'w');
-    fprintf(fileID,'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Image list prediction</title><style type="text/css">img {width:200px;}</style></head><body><h2>Baris Demirdelen, Helena Rusello, Edwin Lima</h2><h1>Settings</h1><table><tr><th>SIFT step size</th><td>2 px</td></tr><tr><th>SIFT block sizes</th><td>[4 6 8 10] px</td></tr>\n');
-    fprintf(fileID,strcat('<tr><th>SIFT method</th><td>', cl, '</td></tr>\n'));
-    fprintf(fileID,strcat('<tr><th>Vocabulary size</th><td>', num2str(vocabsize),' words', '</td></tr>\n'));
-    fprintf(fileID,strcat('<tr><th>Vocabulary fraction</th><td> 1.0 </td></tr>\n'));
-    fprintf(fileID,'<tr><th>SVM training data</th><td>50 positive, 150 negative per class</td></tr><tr><th>SVM kernel type</th><td>Polinomial</td></tr></table>\n');
-    fprintf(fileID,strcat('<h1>Prediction lists (MAP: ', num2str(total_map), ')</h1><table><thead><tr>\n'));
-    fprintf(fileID,strcat('<th>Airplanes (AP: ',num2str(aps(3)),')</th><th>Cars (AP: ',num2str(aps(4)),')</th><th>Faces (AP: ',num2str(aps(2)),')</th><th>Motorbikes (AP: ',num2str(aps(1)),')</th></tr></thead><tbody>\n'));
-    
-    images1 = image_matrix{1};
-    images2 = image_matrix{2};
-    images3 = image_matrix{3};
-    images4 = image_matrix{4};
-    for i=1:size(images1)
-        fprintf(fileID,'<tr>');
-        fprintf(fileID,strcat('<td><img src="',images3{i},'"/></td>'));
-        fprintf(fileID,strcat('<td><img src="',images4{i},'"/></td>'));
-        fprintf(fileID,strcat('<td><img src="',images2{i},'"/></td>'));
-        fprintf(fileID,strcat('<td><img src="',images1{i},'"/></td>'));
-        fprintf(fileID,'</tr>\n');
-    end
-     fprintf(fileID,'</tbody></table></body></html>\n');
-     fclose(fileID)
+fileID = fopen(strcat('results/Result-', cl,'-',num2str(vocabsize),'.html'),'w');
+fprintf(fileID,'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Image list prediction</title><style type="text/css">img {width:200px;}</style></head><body><h2>Baris Demirdelen, Helena Rusello, Edwin Lima</h2><h1>Settings</h1><table><tr><th>SIFT step size</th><td>2 px</td></tr><tr><th>SIFT block sizes</th><td>[4 6 8 10] px</td></tr>\n');
+fprintf(fileID,strcat('<tr><th>SIFT method</th><td>', cl, '</td></tr>\n'));
+fprintf(fileID,strcat('<tr><th>Vocabulary size</th><td>', num2str(vocabsize),' words', '</td></tr>\n'));
+fprintf(fileID,strcat('<tr><th>Vocabulary fraction</th><td> 1.0 </td></tr>\n'));
+fprintf(fileID,'<tr><th>SVM training data</th><td>50 positive, 150 negative per class</td></tr><tr><th>SVM kernel type</th><td>Polinomial</td></tr></table>\n');
+fprintf(fileID,strcat('<h1>Prediction lists (MAP: ', num2str(total_map), ')</h1><table><thead><tr>\n'));
+fprintf(fileID,strcat('<th>Airplanes (AP: ',num2str(aps(3)),')</th><th>Cars (AP: ',num2str(aps(4)),')</th><th>Faces (AP: ',num2str(aps(2)),')</th><th>Motorbikes (AP: ',num2str(aps(1)),')</th></tr></thead><tbody>\n'));
+
+images1 = image_matrix{1};
+images2 = image_matrix{2};
+images3 = image_matrix{3};
+images4 = image_matrix{4};
+for i=1:size(images1)
+    fprintf(fileID,'<tr>');
+    fprintf(fileID,strcat('<td><img src="',images3{i},'"/></td>'));
+    fprintf(fileID,strcat('<td><img src="',images4{i},'"/></td>'));
+    fprintf(fileID,strcat('<td><img src="',images2{i},'"/></td>'));
+    fprintf(fileID,strcat('<td><img src="',images1{i},'"/></td>'));
+    fprintf(fileID,'</tr>\n');
+end
+fprintf(fileID,'</tbody></table></body></html>\n');
+fclose(fileID)
 end
 
 function [map,ids] = calculate_map(centers, cl, classifier, test_images, samplesize)

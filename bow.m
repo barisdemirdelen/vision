@@ -5,11 +5,11 @@ cl_opp = 'opponent';
 cl = cl_rgb;
 samplesize = 5;
 vocabsize = 800;
-numdescr = 2500; %number of descriptors
+numdescr = 250; %number of descriptors
 load_from_file = false;
-vocabs = [400,800,1600,2000,4000];
+vocabs = [4000];
 
-for i=1:5
+for i=1:2
     vocabsize = vocabs(i);
     samplesize = 100;
     disp(vocabsize);
